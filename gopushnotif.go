@@ -21,7 +21,10 @@ import (
 	"github.com/gregdel/pushover"
 )
 
+// Folder to store the screenshot
 const SCREENSHOTS_FOLDER = "out-screenshots-743837871"
+
+// Prefix for the screenshot
 const SCREENSHOT_FILE_NAME = "out-screenshot.png"
 
 func getRegexGroups(regEx, url string) (paramsMap map[string]string) {
