@@ -1,7 +1,9 @@
 # gopushnotif
 Golang script to send notification to Pushover application (along with URL screenshots where message provided in "[id] <url>" format)
 
-Currently, `gowitness` is used to take screenshot and all screenshots are stored in folder `out-screenshots`. Plan is to make this run concurrently in near-future.
+Currently, `gowitness` is used to take screenshot and then send them via pushover. Resolution is kept small, by default, to not exceed Pushover's max attachment limit. 
+
+The input messages are processed by a small number of threads (3, by default) in an attempt to stay under the API limit.
 
 ## Examples
 
@@ -19,6 +21,13 @@ $ echo -e "[test] https://www.google.com\n[test2] https://www.msn.com" | go run 
 
 To only perform *dry-run* to test what the script does and not take screenshots and not send notifications, use `-d -v` flags. 
 
+```
+$ echo -e "[test] https://www.google.com\n[test2] https://www.msn.com" | go run /opt/athena-tools/notify/gopushnotif.go -t $PUSHOVER_APP_TOKEN -u $PUSHOVER_USER_KEY -p -d -v
+[test] https://www.google.com
+[test2] https://www.msn.com
+```
+
+To modify resolution sent to pushover, use `-R` flag. By default, set to `640x480`
 ```
 $ echo -e "[test] https://www.google.com\n[test2] https://www.msn.com" | go run /opt/athena-tools/notify/gopushnotif.go -t $PUSHOVER_APP_TOKEN -u $PUSHOVER_USER_KEY -p -d -v
 [test] https://www.google.com
