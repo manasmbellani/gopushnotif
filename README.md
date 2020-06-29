@@ -9,7 +9,7 @@ Assuming that we have stored the Pushover notification flags in env vars `PUSHOV
 
 Here is a simple example of sending message `Hello World` via pushover. 
 ```
-$ echo -e "Hello World." | go run /opt/athena-tools/notify/gopushnotif.go -t $PUSHOVER_APP_TOKEN -u $PUSHOVER_USER_KEY -p
+$ echo -e "Hello World." | go run /opt/athena-tools/notify/gopushnotif.go -t $PUSHOVER_APP_TOKEN -u $PUSHOVER_USER_KEY
 ```
 
 To send message with `[id] <url>` with a screenshot of URL, add a `-p` flag
