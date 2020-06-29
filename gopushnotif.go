@@ -271,8 +271,14 @@ func main() {
 
 				// Remove the screenshot as already sent to pushover
 				if outfile != "" {
-					log.Printf("Removing screenshot file: %s\n", outfile)
+					log.Printf("Removing screenshot outfile: %s\n", outfile)
 					os.Remove(outfile)
+				}
+
+				// Remove the screenshot folder as well now that screenshot is sent
+				if outfolder != "" {
+					log.Printf("Removing folder: %s\n", outfolder)
+					os.Remove(outfolder)
 				}
 
 				// Print the input message as-is to output
