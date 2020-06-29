@@ -50,7 +50,7 @@ func isURLWithHTTPProtocol(line string) bool {
 
 // Execute a command to get the output, error. Command is executed when in the
 // optionally specified 'cmdDir' OR it is executed with the current working dir
-func execCmd(cmdToExec string, cmdDir string) string {
+func execCmd(cmdToExec string, cmdDir string, dryRun bool) string {
 	// Get the original working directory
 	owd, _ := os.Getwd()
 
@@ -64,23 +64,27 @@ func execCmd(cmdToExec string, cmdDir string) string {
 
 	log.Printf("[v] Executing cmd: %s in dir: %s\n", cmdToExec, cwd)
 
-	cmd := exec.Command("/bin/bash", "-c", cmdToExec)
-	out, err := cmd.CombinedOutput()
-	var outStr, errStr string
-	if out == nil {
-		outStr = ""
-	} else {
-		outStr = string(out)
-	}
+	totalOut := ""
+	if !dryRun {
 
-	if err == nil {
-		errStr = ""
-	} else {
-		errStr = string(err.Error())
-		//log.Printf("Command Error: %s\n", err)
-	}
+		cmd := exec.Command("/bin/bash", "-c", cmdToExec)
+		out, err := cmd.CombinedOutput()
+		var outStr, errStr string
+		if out == nil {
+			outStr = ""
+		} else {
+			outStr = string(out)
+		}
 
-	totalOut := (outStr + "\n" + errStr)
+		if err == nil {
+			errStr = ""
+		} else {
+			errStr = string(err.Error())
+			//log.Printf("Command Error: %s\n", err)
+		}
+
+		totalOut = (outStr + "\n" + errStr)
+	}
 
 	// Switch back to the original working directory
 	os.Chdir(owd)
@@ -89,7 +93,11 @@ func execCmd(cmdToExec string, cmdDir string) string {
 }
 
 // Take screenshot utilising 'gowitness' and return screenshot output file path
-func takeScreenshot(url string, screenshotName string, gowitnessBin string) string {
+func takeScreenshot(url string, screenshotName string, gowitnessBin string,
+	dryRun bool) string {
+
+	// Output file path where screenshot is written
+	outfile := ""
 
 	// Default to screenshot.png if not specified
 	if screenshotName == "" {
@@ -118,15 +126,13 @@ func takeScreenshot(url string, screenshotName string, gowitnessBin string) stri
 			SCREENSHOT_FILE_NAME)
 		screenshotCmd = strings.ReplaceAll(screenshotCmd, "{gowitness}",
 			gowitnessBin)
-		outfile := path.Join(SCREENSHOTS_FOLDER, SCREENSHOT_FILE_NAME)
+		outfile = path.Join(SCREENSHOTS_FOLDER, SCREENSHOT_FILE_NAME)
 
-		execCmd(screenshotCmd, "")
+		execCmd(screenshotCmd, "", dryRun)
 
-		return outfile
-
-	} else {
-		return ""
 	}
+
+	return outfile
 
 }
 
@@ -139,6 +145,7 @@ func takeScreenshot(url string, screenshotName string, gowitnessBin string) stri
 //}
 
 func main() {
+	dryRunPtr := flag.Bool("d", false, "Dry run only - so only messages are printed")
 	userKeyPtr := flag.String("u", "", "Pushover User key")
 	appTokenPtr := flag.String("t", "", "Pushover App Token")
 	attachmentPtr := flag.String("a", "", "Attachment path")
@@ -154,6 +161,7 @@ func main() {
 	parseSignature := *parseSignaturePtr
 	verbose := *verbosePtr
 	gowitness := *gowitnessPtr
+	dryRun := *dryRunPtr
 
 	if appToken == "" {
 		log.Fatalf("[-] App Token must be specified")
@@ -195,28 +203,33 @@ func main() {
 
 						log.Printf("Taking screenshot of URL: %s\n", url)
 						outfile = takeScreenshot(url, SCREENSHOT_FILE_NAME,
-							gowitness)
+							gowitness, dryRun)
 					}
 				}
 			}
 
-			// Create the message to send
-			message := pushover.NewMessage(line)
-			if attachment != "" {
-				file, _ := os.Open(attachment)
-				message.AddAttachment(bufio.NewReader(file))
-			}
+			if !dryRun {
+				// Create the message to send
+				message := pushover.NewMessage(line)
+				if attachment != "" {
+					file, _ := os.Open(attachment)
+					message.AddAttachment(bufio.NewReader(file))
+				}
 
-			// Attach the output file as well
-			if outfile != "" {
-				file, _ := os.Open(outfile)
-				message.AddAttachment(bufio.NewReader(file))
-			}
+				// Attach the output file as well
+				if outfile != "" {
+					file, _ := os.Open(outfile)
+					message.AddAttachment(bufio.NewReader(file))
+				}
 
-			// Send the image, and the response details too
-			response, err := app.SendMessage(message, recipient)
-			if err != nil {
-				log.Panic(err)
+				// Send the image, and the response details too
+				response, err := app.SendMessage(message, recipient)
+				if err != nil {
+					log.Panic(err)
+				}
+
+				// Print the Pushover API response
+				log.Printf("Pushover API Response: %+v", response)
 			}
 
 			// Remove the screenshot as already sent to pushover
@@ -224,9 +237,6 @@ func main() {
 				log.Printf("Removing screenshot file: %s\n", outfile)
 				os.Remove(outfile)
 			}
-
-			// Print the Pushover API response
-			log.Printf("Pushover API Response: %+v", response)
 
 			// Print the input message as-is to output
 			fmt.Println(line)
