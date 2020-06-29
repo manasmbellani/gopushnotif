@@ -16,3 +16,11 @@ To send message with `[id] <url>` with a screenshot of URL, add a `-p` flag
 ```
 $ echo -e "[test] https://www.google.com\n[test2] https://www.msn.com" | go run /opt/athena-tools/notify/gopushnotif.go -t $PUSHOVER_APP_TOKEN -u $PUSHOVER_USER_KEY -p
 ```
+
+To only perform *dry-run* to test what the script does and not take screenshots and not send notifications, use `-d -v` flags. 
+
+```
+$ echo -e "[test] https://www.google.com\n[test2] https://www.msn.com" | go run /opt/athena-tools/notify/gopushnotif.go -t $PUSHOVER_APP_TOKEN -u $PUSHOVER_USER_KEY -p -d -v
+[test] https://www.google.com
+[test2] https://www.msn.com
+```
