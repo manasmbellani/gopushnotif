@@ -219,13 +219,14 @@ func main() {
 				log.Panic(err)
 			}
 
+			// Remove the screenshot as already sent to pushover
+			if outfile != "" {
+				log.Printf("Removing screenshot file: %s\n", outfile)
+				os.Remove(outfile)
+			}
+
 			// Print the Pushover API response
 			log.Printf("Pushover API Response: %+v", response)
-
-			// Print any error messages
-			if err != nil {
-				log.Panic(err)
-			}
 
 			// Print the input message as-is to output
 			fmt.Println(line)
