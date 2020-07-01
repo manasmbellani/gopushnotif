@@ -100,7 +100,7 @@ func execCmd(cmdToExec string, cmdDir string, dryRun bool) string {
 
 // Take screenshot utilising 'gowitness' and return screenshot output file path
 func takeScreenshot(url string, screenshotFolder string, screenshotName string,
-	gowitnessBin string, screenshotRes string, dryRun bool) string {
+	gowitnessBin string, screenshotRes string, timeout int, dryRun bool) string {
 
 	// Output file path where screenshot is written
 	outfile := ""
@@ -113,7 +113,7 @@ func takeScreenshot(url string, screenshotFolder string, screenshotName string,
 	// Prepare screenshot template by clearing screenshots from the folder and
 	// then take gowitness in the folder
 	screenshotTmp := "rm {screenshots_folder}/*; "
-	screenshotTmp += "{gowitness} single --url {url} -d {screenshots_folder} -R {screenshot_res}; "
+	screenshotTmp += "{gowitness} single --url {url} -d {screenshots_folder} --chrome-timeout {timeout} -R {screenshot_res};"
 	screenshotTmp += "mv {screenshots_folder}/*.png {screenshots_folder}/{screenshot_name}"
 
 	// Create the screenshot folder if it doesn't exist
@@ -137,6 +137,10 @@ func takeScreenshot(url string, screenshotFolder string, screenshotName string,
 			screenshotName)
 		screenshotCmd = strings.ReplaceAll(screenshotCmd, "{gowitness}",
 			gowitnessBin)
+
+		timeoutStr := strconv.FormatInt(int64(timeout), 10)
+		screenshotCmd = strings.ReplaceAll(screenshotCmd, "{timeout}",
+			timeoutStr)
 		outfile = path.Join(screenshotFolder, screenshotName)
 
 		execCmd(screenshotCmd, "", dryRun)
@@ -159,6 +163,7 @@ func main() {
 	userKeyPtr := flag.String("u", "", "Pushover User key")
 	appTokenPtr := flag.String("t", "", "Pushover App Token")
 	attachmentPtr := flag.String("a", "", "Attachment path")
+	timeoutPtr := flag.Int("i", 8, "Chrome timeout to take screenshot for gowitness")
 	parseSignaturePtr := flag.Bool("p", false,
 		"Parse signature of format '[id]: url', and send screenshot if URL of form https://,http:// detected")
 	verbosePtr := flag.Bool("v", false, "Verbose message")
@@ -176,6 +181,7 @@ func main() {
 	dryRun := *dryRunPtr
 	numThreads := *numThreadsPtr
 	screenshotRes := *screenshotResPtr
+	timeout := *timeoutPtr
 
 	if appToken == "" {
 		log.Fatalf("[-] App Token must be specified")
@@ -239,7 +245,7 @@ func main() {
 
 							log.Printf("Taking screenshot of URL: %s\n", url)
 							outfile = takeScreenshot(url, outfolder, outfileName,
-								gowitness, screenshotRes, dryRun)
+								gowitness, screenshotRes, timeout, dryRun)
 						}
 					}
 				}
@@ -255,8 +261,15 @@ func main() {
 
 					// Attach the output file as well
 					if outfile != "" {
-						file, _ := os.Open(outfile)
-						message.AddAttachment(bufio.NewReader(file))
+
+						// First check if it even exists
+						_, err := os.Stat(outfile)
+						if !os.IsNotExist(err) {
+							file, _ := os.Open(outfile)
+							message.AddAttachment(bufio.NewReader(file))
+						} else {
+							log.Printf("File: %s did not exist. Can't send screenshot.", outfile)
+						}
 					}
 
 					// Send the image, and the response details too

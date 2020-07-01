@@ -35,6 +35,4 @@ $ echo -e "[test] https://www.google.com\n[test2] https://www.msn.com" | go run 
 ```
 
 ## Misc
-* TODO: Add option to not take screenshot
-* TODO: Add an modifiable timeout for the screenshots 
 * TODO: Add support for sending notification by slack
