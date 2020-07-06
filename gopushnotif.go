@@ -268,7 +268,7 @@ func main() {
 							file, _ := os.Open(outfile)
 							message.AddAttachment(bufio.NewReader(file))
 						} else {
-							log.Printf("File: %s did not exist. Can't send screenshot.", outfile)
+							log.Printf("[!] File: %s did not exist. Can't send screenshot.", outfile)
 						}
 					}
 
