@@ -259,10 +259,11 @@ func main() {
 						message.AddAttachment(bufio.NewReader(file))
 					}
 
-					// Attach the output file as well
+					// Attach the screenshot output file if taken successfully
 					if outfile != "" {
 
-						// First check if it even exists
+						// First check if it even exists - sometimes due to err
+						// screenshot may not be taken
 						_, err := os.Stat(outfile)
 						if !os.IsNotExist(err) {
 							file, _ := os.Open(outfile)
@@ -272,7 +273,8 @@ func main() {
 						}
 					}
 
-					// Send the image, and the response details too
+					// Send the message with optional screenshot, and response
+					// details too
 					response, err := app.SendMessage(message, recipient)
 					if err != nil {
 						log.Println(err)
