@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -73,7 +74,16 @@ func execCmd(cmdToExec string, cmdDir string, dryRun bool) string {
 	totalOut := ""
 	if !dryRun {
 
-		cmd := exec.Command("/bin/bash", "-c", cmdToExec)
+		// Determine the command to execute based on OS
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "windows":
+			cmd = exec.Command("cmd.exe", "/c", cmdToExec)
+		default:
+			cmd = exec.Command("/bin/sh", "-c", cmdToExec)
+		}
+
+		// Execute the command
 		out, err := cmd.CombinedOutput()
 		var outStr, errStr string
 		if out == nil {
