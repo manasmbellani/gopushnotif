@@ -9,6 +9,8 @@ The input messages are processed by a small number of threads (3, by default) in
 
 Assuming that we have stored the Pushover notification flags in env vars `PUSHOVER_APP_TOKEN` and `PUSHOVER_USER_KEY`, below are some examples of how to use this.
 
+`Update`: Since `12th Aug 2020`, if you have Pushover's User Key and Pushover's App Token in `PUSHOVER_USER_KEY` and `PUSHOVER_APP_TOKEN` in env vars, then you do not need to provided them again at `-t` and `-u`.
+
 Here is a simple example of sending message `Hello World` via pushover. 
 ```
 $ echo -e "Hello World." | go run /opt/athena-tools/notify/gopushnotif.go -t $PUSHOVER_APP_TOKEN -u $PUSHOVER_USER_KEY

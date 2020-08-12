@@ -25,11 +25,17 @@ import (
 	"github.com/gregdel/pushover"
 )
 
-// SCREENSHOTS_FOLDER - Folder to store the screenshot
+// ScreenshotFolderPrefix - Folder to store the screenshot
 const ScreenshotFolderPrefix = "out-screenshots"
 
-// SCREENSHOT_FILE_PREFIX - Prefix for the screenshot
+// ScreenshotFilePrefix - Prefix for the screenshot
 const ScreenshotFilePrefix = "out-screenshot"
+
+// PushoverUserKey - Pushover user key name in env var
+const PushoverUserKey = "PUSHOVER_USER_KEY"
+
+// PushoverAppToken - Pushover app token name in env var
+const PushoverAppToken = "PUSHOVER_APP_TOKEN"
 
 func getRegexGroups(regEx, url string) (paramsMap map[string]string) {
 
@@ -170,8 +176,8 @@ func takeScreenshot(url string, screenshotFolder string, screenshotName string,
 
 func main() {
 	dryRunPtr := flag.Bool("d", false, "Dry run only - so only messages are printed")
-	userKeyPtr := flag.String("u", "", "Pushover User key")
-	appTokenPtr := flag.String("t", "", "Pushover App Token")
+	userKeyPtr := flag.String("u", "", "Pushover User key, if not specified in env var")
+	appTokenPtr := flag.String("t", "", "Pushover App Token, if not specified in env var")
 	attachmentPtr := flag.String("a", "", "Attachment path")
 	timeoutPtr := flag.Int("i", 8, "Chrome timeout to take screenshot for gowitness")
 	parseSignaturePtr := flag.Bool("p", false,
@@ -194,11 +200,19 @@ func main() {
 	timeout := *timeoutPtr
 
 	if appToken == "" {
-		log.Fatalf("[-] App Token must be specified")
+		// Check if Pushover App Token supplied in env vars
+		appToken = os.Getenv(PushoverAppToken)
+		if appToken == "" {
+			log.Fatalf("[-] Pushover App Token must be specified either as input OR in env var")
+		}
 	}
 
 	if userKey == "" {
-		log.Fatalf("[-] User Key must be specified")
+		// Check if Pushover User Key supplied in env vars
+		userKey = os.Getenv(PushoverUserKey)
+		if userKey == "" {
+			log.Fatalf("[-] Pushover User Key must be specified either as input OR in env var")
+		}
 	}
 
 	// Decide whether to display verbose log messages, or not
