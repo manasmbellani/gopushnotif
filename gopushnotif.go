@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"./anewlib"
+
 	"github.com/gregdel/pushover"
 )
 
@@ -186,6 +188,8 @@ func main() {
 	gowitnessPtr := flag.String("g", "gowitness",
 		"Path to gowitness to take screenshot")
 	numThreadsPtr := flag.Int("n", 3, "Number of threads")
+	notfFile := flag.String("f", "out-notf.txt", "notification file which contains all notifications - repeat notifications are de-duplicated from the list")
+	clearnotf := flag.Bool("cf", false, "Clear notifications file and start afresh")
 	screenshotResPtr := flag.String("r", "640,480", "Screenshot's resolution")
 	flag.Parse()
 	userKey := *userKeyPtr
@@ -219,6 +223,14 @@ func main() {
 	if !verbose {
 		log.SetFlags(0)
 		log.SetOutput(ioutil.Discard)
+	}
+
+	// Clear the notifications file, if found
+	if *clearnotf {
+		_, err := os.Stat(*notfFile)
+		if !os.IsNotExist(err) {
+			os.Remove(*notfFile)
+		}
 	}
 
 	// Create a channel to hold the messages to process
@@ -274,54 +286,61 @@ func main() {
 					}
 				}
 
-				log.Printf("Sending message: %s\n", line)
-				if !dryRun {
-					// Create the message to send
-					message := pushover.NewMessage(line)
-					if attachment != "" {
-						file, _ := os.Open(attachment)
-						message.AddAttachment(bufio.NewReader(file))
-					}
+				// Determine if the message is duplicated compared to notifications file
+				linesToSend := anewlib.Anew([]string{line}, *notfFile, true, false)
 
-					// Attach the screenshot output file if taken successfully
-					if outfile != "" {
-
-						// First check if it even exists - sometimes due to err
-						// screenshot may not be taken
-						_, err := os.Stat(outfile)
-						if !os.IsNotExist(err) {
-							file, _ := os.Open(outfile)
+				// Send the message by pushover, if message not duplicated as
+				// confirmed via anew
+				if len(linesToSend) > 0 {
+					log.Printf("Sending message: %s\n", line)
+					if !dryRun {
+						// Create the message to send
+						message := pushover.NewMessage(line)
+						if attachment != "" {
+							file, _ := os.Open(attachment)
 							message.AddAttachment(bufio.NewReader(file))
-						} else {
-							log.Printf("[!] File: %s did not exist. Can't send screenshot.", outfile)
 						}
+
+						// Attach the screenshot output file if taken successfully
+						if outfile != "" {
+
+							// First check if it even exists - sometimes due to err
+							// screenshot may not be taken
+							_, err := os.Stat(outfile)
+							if !os.IsNotExist(err) {
+								file, _ := os.Open(outfile)
+								message.AddAttachment(bufio.NewReader(file))
+							} else {
+								log.Printf("[!] File: %s did not exist. Can't send screenshot.", outfile)
+							}
+						}
+
+						// Send the message with optional screenshot, and response
+						// details too
+						response, err := app.SendMessage(message, recipient)
+						if err != nil {
+							log.Println(err)
+						}
+
+						// Print the Pushover API response
+						log.Printf("Pushover API Response: %+v", response)
 					}
 
-					// Send the message with optional screenshot, and response
-					// details too
-					response, err := app.SendMessage(message, recipient)
-					if err != nil {
-						log.Println(err)
+					// Remove the screenshot as already sent to pushover
+					if outfile != "" {
+						log.Printf("Removing screenshot outfile: %s\n", outfile)
+						os.Remove(outfile)
 					}
 
-					// Print the Pushover API response
-					log.Printf("Pushover API Response: %+v", response)
-				}
+					// Remove the screenshot folder as well now that screenshot is sent
+					if outfolder != "" {
+						log.Printf("Removing folder: %s\n", outfolder)
+						os.Remove(outfolder)
+					}
 
-				// Remove the screenshot as already sent to pushover
-				if outfile != "" {
-					log.Printf("Removing screenshot outfile: %s\n", outfile)
-					os.Remove(outfile)
+					// Print the input message as-is to output
+					fmt.Println(line)
 				}
-
-				// Remove the screenshot folder as well now that screenshot is sent
-				if outfolder != "" {
-					log.Printf("Removing folder: %s\n", outfolder)
-					os.Remove(outfolder)
-				}
-
-				// Print the input message as-is to output
-				fmt.Println(line)
 			}
 		}()
 	}
