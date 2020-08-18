@@ -66,7 +66,7 @@ func Anew(nl []string, fn string, quietMode bool, readFromStdin bool) []string {
 		}
 	} else {
 
-		for l := range lines {
+		for _, l := range nl {
 			if lines[l] {
 				continue
 			}
