@@ -1,8 +1,6 @@
 // Function to send go push notification to pushover app.
 // It also recognises special lines in the format [sig] urls if `-p` flag is set
 // and takes a screenshot via gowitness (which should be installed in PATH dir)
-//
-
 package main
 
 import (
@@ -21,8 +19,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"./anewlib"
 
 	"github.com/gregdel/pushover"
 )
@@ -58,9 +54,8 @@ func isURLWithHTTPProtocol(line string) bool {
 	if strings.Index(line, "http://") != -1 ||
 		strings.Index(line, "https://") != -1 {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 // Execute a command to get the output, error. Command is executed when in the
@@ -168,40 +163,33 @@ func takeScreenshot(url string, screenshotFolder string, screenshotName string,
 
 }
 
-// Worker function that will send a notification reading from the channel
-//unc goSendNotf(app *pushover.Pushover, recipient *pushover.Pushover, msgs chan string, attachment string) {
-//	for msg := range msgs {
-//
-//	}
-//
-//}
-
 func main() {
-	dryRunPtr := flag.Bool("d", false, "Dry run only - so only messages are printed")
-	userKeyPtr := flag.String("u", "", "Pushover User key, if not specified in env var")
-	appTokenPtr := flag.String("t", "", "Pushover App Token, if not specified in env var")
-	attachmentPtr := flag.String("a", "", "Attachment path")
-	timeoutPtr := flag.Int("i", 8, "Chrome timeout to take screenshot for gowitness")
-	parseSignaturePtr := flag.Bool("p", false,
+	var dryRun bool
+	var userKey string
+	var appToken string
+	var attachment string
+	var timeout int
+	var parseSignature bool
+	var verbose bool
+	var gowitness string
+	var numThreads int
+	var screenshotRes string
+	var sendUnique bool
+
+	flag.BoolVar(&dryRun, "d", false, "Dry run only - so only messages are printed")
+	flag.StringVar(&userKey, "u", "", "Pushover User key, if not specified in env var")
+	flag.StringVar(&appToken, "t", "", "Pushover App Token, if not specified in env var")
+	flag.StringVar(&attachment, "a", "", "Attachment path")
+	flag.IntVar(&timeout, "i", 8, "Chrome timeout to take screenshot for gowitness")
+	flag.BoolVar(&parseSignature, "p", false,
 		"Parse signature of format '[id]: url', and send screenshot if URL of form https://,http:// detected")
-	verbosePtr := flag.Bool("v", false, "Verbose message")
-	gowitnessPtr := flag.String("g", "gowitness",
+	flag.BoolVar(&verbose, "v", false, "Verbose message")
+	flag.StringVar(&gowitness, "g", "gowitness",
 		"Path to gowitness to take screenshot")
-	numThreadsPtr := flag.Int("n", 3, "Number of threads")
-	notfFile := flag.String("f", "out-notf.txt", "notification file which contains all notifications - repeat notifications are de-duplicated from the list")
-	clearnotf := flag.Bool("cf", false, "Clear notifications file and start afresh")
-	screenshotResPtr := flag.String("r", "640,480", "Screenshot's resolution")
+	flag.IntVar(&numThreads, "n", 3, "Number of threads")
+	flag.StringVar(&screenshotRes, "r", "640,480", "Screenshot's resolution")
+	flag.BoolVar(&sendUnique, "su", false, "Send unique requests only")
 	flag.Parse()
-	userKey := *userKeyPtr
-	appToken := *appTokenPtr
-	attachment := *attachmentPtr
-	parseSignature := *parseSignaturePtr
-	verbose := *verbosePtr
-	gowitness := *gowitnessPtr
-	dryRun := *dryRunPtr
-	numThreads := *numThreadsPtr
-	screenshotRes := *screenshotResPtr
-	timeout := *timeoutPtr
 
 	if appToken == "" {
 		// Check if Pushover App Token supplied in env vars
@@ -225,16 +213,11 @@ func main() {
 		log.SetOutput(ioutil.Discard)
 	}
 
-	// Clear the notifications file, if found
-	if *clearnotf {
-		_, err := os.Stat(*notfFile)
-		if !os.IsNotExist(err) {
-			os.Remove(*notfFile)
-		}
-	}
-
 	// Create a channel to hold the messages to process
 	lines := make(chan string)
+
+	// Lines previously sent should be captured
+	linesSent := make(map[string]bool)
 
 	// Create a new Pushover App with a token
 	app := pushover.New(appToken)
@@ -286,12 +269,17 @@ func main() {
 					}
 				}
 
-				// Determine if the message is duplicated compared to notifications file
-				linesToSend := anewlib.Anew([]string{line}, *notfFile, true, false)
+				// Track if lines have been previously sent if sendUnique flag
+				// is set
+				found := false
+				if sendUnique {
+					_, found = linesSent[line]
+					linesSent[line] = true
+				}
 
 				// Send the message by pushover, if message not duplicated as
 				// confirmed via anew
-				if len(linesToSend) > 0 {
+				if (sendUnique && !found) || !sendUnique {
 					log.Printf("Sending message: %s\n", line)
 					if !dryRun {
 						// Create the message to send
@@ -323,18 +311,18 @@ func main() {
 						}
 
 						// Print the Pushover API response
-						log.Printf("Pushover API Response: %+v", response)
+						log.Printf("[*] Pushover API Response: %+v", response)
 					}
 
 					// Remove the screenshot as already sent to pushover
 					if outfile != "" {
-						log.Printf("Removing screenshot outfile: %s\n", outfile)
+						log.Printf("[*] Removing screenshot outfile: %s\n", outfile)
 						os.Remove(outfile)
 					}
 
 					// Remove the screenshot folder as well now that screenshot is sent
 					if outfolder != "" {
-						log.Printf("Removing folder: %s\n", outfolder)
+						log.Printf("[*] Removing folder: %s\n", outfolder)
 						os.Remove(outfolder)
 					}
 
@@ -350,7 +338,7 @@ func main() {
 	for sc.Scan() {
 		line := sc.Text()
 		if line != "" {
-			log.Printf("Added line: %s for processing", line)
+			log.Printf("[*] Added line: %s for processing", line)
 			lines <- line
 		}
 	}
