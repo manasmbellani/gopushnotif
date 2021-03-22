@@ -177,8 +177,10 @@ func main() {
 	var sendUnique bool
 
 	flag.BoolVar(&dryRun, "d", false, "Dry run only - so only messages are printed")
-	flag.StringVar(&userKey, "u", "", "Pushover User key, if not specified in env var")
-	flag.StringVar(&appToken, "t", "", "Pushover App Token, if not specified in env var")
+	flag.StringVar(&userKey, "u", "", 
+		fmt.Sprintf("Pushover User key, if not specified in env var: %s", PushoverUserKey))
+	flag.StringVar(&appToken, "t", "", 
+		fmt.Sprintf("Pushover App Token, if not specified in env var: %s", PushoverAppToken))
 	flag.StringVar(&attachment, "a", "", "Attachment path")
 	flag.IntVar(&timeout, "i", 8, "Chrome timeout to take screenshot for gowitness")
 	flag.BoolVar(&parseSignature, "p", false,
