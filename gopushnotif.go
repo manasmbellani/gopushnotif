@@ -221,12 +221,12 @@ func main() {
 	}
 
 	if userKey == "" {
-		// Check if Pushover User Key supplied in env vars
-		userKey = os.Getenv(PushoverUserKey)
 		if pullSecretsFromAWS {
 			// Pull the secret from AWS Secrets Manager
 			userKey = GetAWSSecret(pushoverUserKeyAWSSecret, awsRegion, awsProfile)	
 		} else {
+			// Check if Pushover User Key supplied in env vars
+			userKey = os.Getenv(PushoverUserKey)
 			if userKey == "" {
 				log.Fatalf("[-] Pushover User Key must be specified either as input OR in env var")
 			}
