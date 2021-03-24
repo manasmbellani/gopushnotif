@@ -175,12 +175,26 @@ func main() {
 	var numThreads int
 	var screenshotRes string
 	var sendUnique bool
+	var pullSecretsFromAWS bool
+	var pushoverUserKeyAWSSecret string
+	var pushoverAppTokenAWSSecret string
+	var awsProfile string
+	var awsRegion string
 
 	flag.BoolVar(&dryRun, "d", false, "Dry run only - so only messages are printed")
 	flag.StringVar(&userKey, "u", "", 
 		fmt.Sprintf("Pushover User key, if not specified in env var: %s", PushoverUserKey))
 	flag.StringVar(&appToken, "t", "", 
 		fmt.Sprintf("Pushover App Token, if not specified in env var: %s", PushoverAppToken))
+	flag.BoolVar(&pullSecretsFromAWS, "pa", false, "Pull the secrets from AWS")
+	flag.StringVar(&pushoverUserKeyAWSSecret, "puka", PushoverUserKey, 
+		"Name of the AWS Secrets Manager secret containing pushover user key")
+	flag.StringVar(&pushoverAppTokenAWSSecret, "pata", PushoverAppToken,
+		"Name of the AWS Secrets Manager secret containing pushover app Token")
+	flag.StringVar(&awsProfile, "ap", "",
+		"Name of AWS Profile if pulling Pushover creds from AWS Secrets Manager")
+	flag.StringVar(&awsRegion, "ar", "ap-southeast-2", 
+		"AWS Region")
 	flag.StringVar(&attachment, "a", "", "Attachment path")
 	flag.IntVar(&timeout, "i", 8, "Chrome timeout to take screenshot for gowitness")
 	flag.BoolVar(&parseSignature, "p", false,
@@ -194,20 +208,35 @@ func main() {
 	flag.Parse()
 
 	if appToken == "" {
-		// Check if Pushover App Token supplied in env vars
-		appToken = os.Getenv(PushoverAppToken)
-		if appToken == "" {
-			log.Fatalf("[-] Pushover App Token must be specified either as input OR in env var")
+		if pullSecretsFromAWS {
+			// Pull the secret from AWS Secrets Manager
+			appToken = GetAWSSecret(pushoverAppTokenAWSSecret, awsRegion, awsProfile)
+		} else {
+			// Check if Pushover App Token supplied in env vars
+			appToken = os.Getenv(PushoverAppToken)
+			if appToken == "" {
+				log.Fatalf("[-] Pushover App Token must be specified either as input OR in env var")
+			}
 		}
 	}
 
 	if userKey == "" {
 		// Check if Pushover User Key supplied in env vars
 		userKey = os.Getenv(PushoverUserKey)
-		if userKey == "" {
-			log.Fatalf("[-] Pushover User Key must be specified either as input OR in env var")
+		if pullSecretsFromAWS {
+			// Pull the secret from AWS Secrets Manager
+			userKey = GetAWSSecret(pushoverUserKeyAWSSecret, awsRegion, awsProfile)	
+		} else {
+			if userKey == "" {
+				log.Fatalf("[-] Pushover User Key must be specified either as input OR in env var")
+			}
 		}
 	}
+
+	// Checking if pushover user key and app token is available
+	if appToken == "" || userKey == "" {
+		log.Fatalf("[-] Both Pushover User key and App token must be provided")
+	}	
 
 	// Decide whether to display verbose log messages, or not
 	if !verbose {
