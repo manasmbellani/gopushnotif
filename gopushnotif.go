@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/gregdel/pushover"
+	"github.com/go-resty/resty/v2"
 )
 
 // ScreenshotFolderPrefix - Folder to store the screenshot
@@ -34,6 +35,13 @@ const PushoverUserKey = "PUSHOVER_USER_KEY"
 
 // PushoverAppToken - Pushover app token name in env var
 const PushoverAppToken = "PUSHOVER_APP_TOKEN"
+
+// SumologicCollectorURL - Sumologic collector URL name in env var
+const SumoCollectorURL = "SUMOLOGIC_COLLECTOR_URL"
+
+// UserAgentString - is the default user agent string to use for sending 
+// messages to Sumo
+const UserAgentString = "Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36"
 
 func getRegexGroups(regEx, url string) (paramsMap map[string]string) {
 
@@ -175,22 +183,32 @@ func main() {
 	var numThreads int
 	var screenshotRes string
 	var sendUnique bool
+	var collectorURL string	
+	var sendToPushover bool
+	var sendToSumo bool
 	var pullSecretsFromAWS bool
+	var collectorURLAWSSecret string
 	var pushoverUserKeyAWSSecret string
 	var pushoverAppTokenAWSSecret string
 	var awsProfile string
 	var awsRegion string
 
 	flag.BoolVar(&dryRun, "d", false, "Dry run only - so only messages are printed")
+	flag.BoolVar(&sendToPushover, "sp", true, "Send notifications to pushover (set by default)")
+	flag.BoolVar(&sendToSumo, "ss", false, "Send to Sumo")
 	flag.StringVar(&userKey, "u", "", 
 		fmt.Sprintf("Pushover User key, if not specified in env var: %s", PushoverUserKey))
 	flag.StringVar(&appToken, "t", "", 
 		fmt.Sprintf("Pushover App Token, if not specified in env var: %s", PushoverAppToken))
+	flag.StringVar(&collectorURL, "scu", "", 
+		fmt.Sprintf("Sumo collector URL, if not specified in env var: %s", SumoCollectorURL))
 	flag.BoolVar(&pullSecretsFromAWS, "pa", false, "Pull the secrets from AWS")
 	flag.StringVar(&pushoverUserKeyAWSSecret, "puka", PushoverUserKey, 
 		"Name of the AWS Secrets Manager secret containing pushover user key")
 	flag.StringVar(&pushoverAppTokenAWSSecret, "pata", PushoverAppToken,
 		"Name of the AWS Secrets Manager secret containing pushover app Token")
+	flag.StringVar(&collectorURLAWSSecret, "scua", SumoCollectorURL,
+		"Name of the AWS Secrets Manager secret containing collector URL")
 	flag.StringVar(&awsProfile, "ap", "",
 		"Name of AWS Profile if pulling Pushover creds from AWS Secrets Manager")
 	flag.StringVar(&awsRegion, "ar", "ap-southeast-2", 
@@ -207,36 +225,23 @@ func main() {
 	flag.BoolVar(&sendUnique, "su", false, "Send unique requests only")
 	flag.Parse()
 
-	if appToken == "" {
-		if pullSecretsFromAWS {
-			// Pull the secret from AWS Secrets Manager
-			appToken = GetAWSSecret(pushoverAppTokenAWSSecret, awsRegion, awsProfile)
-		} else {
-			// Check if Pushover App Token supplied in env vars
-			appToken = os.Getenv(PushoverAppToken)
-			if appToken == "" {
-				log.Fatalf("[-] Pushover App Token must be specified either as input OR in env var")
-			}
-		}
-	}
-
-	if userKey == "" {
-		if pullSecretsFromAWS {
-			// Pull the secret from AWS Secrets Manager
-			userKey = GetAWSSecret(pushoverUserKeyAWSSecret, awsRegion, awsProfile)	
-		} else {
-			// Check if Pushover User Key supplied in env vars
-			userKey = os.Getenv(PushoverUserKey)
-			if userKey == "" {
-				log.Fatalf("[-] Pushover User Key must be specified either as input OR in env var")
-			}
-		}
-	}
+	appToken = getAppToken(appToken, pushoverAppTokenAWSSecret, awsRegion, 
+		awsProfile, pullSecretsFromAWS, sendToPushover)
+	userKey = getUserKey(userKey, pushoverUserKeyAWSSecret, awsRegion, awsProfile, 
+		pullSecretsFromAWS, sendToPushover)
+	collectorURL = getSumoCollectorURL(collectorURL, collectorURLAWSSecret, awsRegion, 
+		awsProfile, pullSecretsFromAWS, sendToSumo)
 
 	// Checking if pushover user key and app token is available
-	if appToken == "" || userKey == "" {
+	if sendToPushover && (appToken == "" || userKey == "") {
 		log.Fatalf("[-] Both Pushover User key and App token must be provided")
 	}	
+
+	// Checking if Sumo collector URL and app token is available
+	if sendToSumo && (collectorURL == "") {
+		log.Fatalf("[-] Sumo collector URL must be provided")
+	}	
+
 
 	// Decide whether to display verbose log messages, or not
 	if !verbose {
@@ -261,6 +266,13 @@ func main() {
 	r1 := rand.New(s1)
 
 	var wg sync.WaitGroup
+
+	// Configure Resty client with content type/user agent string
+	var restyClient *resty.Client
+	if sendToSumo {
+		restyClient = resty.New()
+		configureResty(restyClient, UserAgentString)
+	}
 
 	// Start the goroutines to process the lines provided from channel
 	for i := 0; i < numThreads; i++ {
@@ -311,38 +323,14 @@ func main() {
 				// Send the message by pushover, if message not duplicated as
 				// confirmed via anew
 				if (sendUnique && !found) || !sendUnique {
-					log.Printf("Sending message: %s\n", line)
-					if !dryRun {
-						// Create the message to send
-						message := pushover.NewMessage(line)
-						if attachment != "" {
-							file, _ := os.Open(attachment)
-							message.AddAttachment(bufio.NewReader(file))
-						}
+					if sendToPushover {
+						log.Printf("Sending message via Pushover: %s\n", line)
+						sendMessageViaPushover(app, recipient, line, attachment, 
+							outfile, dryRun)
+					}
 
-						// Attach the screenshot output file if taken successfully
-						if outfile != "" {
-
-							// First check if it even exists - sometimes due to err
-							// screenshot may not be taken
-							_, err := os.Stat(outfile)
-							if !os.IsNotExist(err) {
-								file, _ := os.Open(outfile)
-								message.AddAttachment(bufio.NewReader(file))
-							} else {
-								log.Printf("[!] File: %s did not exist. Can't send screenshot.", outfile)
-							}
-						}
-
-						// Send the message with optional screenshot, and response
-						// details too
-						response, err := app.SendMessage(message, recipient)
-						if err != nil {
-							log.Println(err)
-						}
-
-						// Print the Pushover API response
-						log.Printf("[*] Pushover API Response: %+v", response)
+					if sendToSumo {
+						sendMessageViaSumo(restyClient, collectorURL, line)
 					}
 
 					// Remove the screenshot as already sent to pushover

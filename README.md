@@ -1,5 +1,5 @@
 # gopushnotif
-Golang script to send notification to Pushover application (along with URL screenshots where message provided in "[id] <url>" format)
+Golang script to send notification to Pushover application (along with URL screenshots where message provided in "[id] <url>" format) or Sumo
 
 Currently, `gowitness` is used to take screenshot and then send them via pushover. Resolution is kept small, by default, to not exceed Pushover's max attachment limit. 
 
