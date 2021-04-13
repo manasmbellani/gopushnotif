@@ -48,5 +48,11 @@ $ echo -e "[test] https://www.google.com\n[test2] https://www.msn.com" | go run 
 [test2] https://www.msn.com
 ```
 
+To send message to sumologic, by default, env variable `SUMOLOGIC_COLLECTOR_URL` must be specified. If specified, then 
+the following command will send message to Sumo: 
+```
+echo '{"msg": "Hello world!"}' | go run gopushnotif.go -ss -v
+```
+
 ## Misc
 * TODO: Add support for sending notification by slack
