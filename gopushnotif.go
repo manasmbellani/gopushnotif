@@ -194,7 +194,7 @@ func main() {
 	var awsRegion string
 
 	flag.BoolVar(&dryRun, "d", false, "Dry run only - so only messages are printed")
-	flag.BoolVar(&sendToPushover, "sp", true, "Send notifications to pushover (set by default)")
+	flag.BoolVar(&sendToPushover, "sp", false, "Send notifications to pushover (set by default)")
 	flag.BoolVar(&sendToSumo, "ss", false, "Send to Sumo")
 	flag.StringVar(&userKey, "u", "", 
 		fmt.Sprintf("Pushover User key, if not specified in env var: %s", PushoverUserKey))
