@@ -54,5 +54,10 @@ the following command will send message to Sumo:
 echo '{"msg": "Hello world!"}' | go run gopushnotif.go -ss -v
 ```
 
+If we wish to filter messages to be sent e.g. to send only messages to sumologic which contain keyword `hello`:
+```
+echo "Hello World." | go run gopushnotif.go -ss -fr 'hello'
+```
+
 ## Misc
 * TODO: Add support for sending notification by slack
