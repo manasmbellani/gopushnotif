@@ -171,6 +171,17 @@ func takeScreenshot(url string, screenshotFolder string, screenshotName string,
 
 }
 
+// msgMatchesRegex is used to check if the message matches the regex specified
+// If regex not set, assumed that match found and message must be sent
+func msgMatchesRegex(regex string, msg string) bool {
+	matchFound := true
+	if regex != "" {
+		matchFound, _ = regexp.MatchString(regex, msg)
+	}
+
+	return matchFound
+}
+
 func main() {
 	var dryRun bool
 	var userKey string
@@ -190,6 +201,7 @@ func main() {
 	var collectorURLAWSSecret string
 	var pushoverUserKeyAWSSecret string
 	var pushoverAppTokenAWSSecret string
+	var filterRegex string
 	var awsProfile string
 	var awsRegion string
 
@@ -223,6 +235,7 @@ func main() {
 	flag.IntVar(&numThreads, "n", 3, "Number of threads")
 	flag.StringVar(&screenshotRes, "r", "640,480", "Screenshot's resolution")
 	flag.BoolVar(&sendUnique, "su", false, "Send unique requests only")
+	flag.StringVar(&filterRegex, "fr", "", "If set, can be used to filter messages to send")
 	flag.Parse()
 
 	appToken = getAppToken(appToken, pushoverAppTokenAWSSecret, awsRegion, 
@@ -323,13 +336,15 @@ func main() {
 				// Send the message by pushover, if message not duplicated as
 				// confirmed via anew
 				if (sendUnique && !found) || !sendUnique {
-					if sendToPushover {
+					matchFound := msgMatchesRegex(filterRegex, line)
+
+					if sendToPushover && matchFound {
 						log.Printf("Sending message via Pushover: %s\n", line)
 						sendMessageViaPushover(app, recipient, line, attachment, 
 							outfile, dryRun)
 					}
 
-					if sendToSumo {
+					if sendToSumo && matchFound {
 						sendMessageViaSumo(restyClient, collectorURL, line)
 					}
 
